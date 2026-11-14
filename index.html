@@ -1,0 +1,961 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Design Wander</title>
+<meta name="description" content="Turn nine photo discoveries into a 3×3 Instagram Story mood board.">
+<meta name="theme-color" content="#F5F4F0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #F5F4F0;
+    --ink: #111111;
+    --muted: #6E6C66;
+    --line: #DAD8D2;
+    --soft: #EAE8E2;
+    --font: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  button, input { font: inherit; color: inherit; }
+  [hidden] { display: none !important; }
+
+  /* ---------- Header ---------- */
+  .top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: calc(18px + env(safe-area-inset-top)) 20px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .eyebrow, .label {
+    margin: 0;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    margin: 2px 0 0;
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: -.01em;
+  }
+  .progress { text-align: right; }
+  .progress-num {
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .progress-num strong { font-weight: 600; }
+  .ticks {
+    display: grid;
+    grid-template-columns: repeat(9, 8px);
+    gap: 3px;
+    margin-top: 6px;
+  }
+  .ticks i {
+    display: block;
+    height: 3px;
+    background: var(--line);
+    transition: background .2s;
+  }
+  .ticks i.on { background: var(--ink); }
+
+  /* ---------- Layout ---------- */
+  .layout {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 20px 16px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .stage {
+    position: relative;
+    height: min(calc(100vh - 230px), calc((100vw - 32px) * 16 / 9), 860px);
+    height: min(calc(100svh - 230px), calc((100vw - 32px) * 16 / 9), 860px);
+    min-height: 360px;
+    aspect-ratio: 9 / 16;
+    outline: 1px solid var(--line);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .stage canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .cells { position: absolute; inset: 0; }
+  .cell {
+    position: absolute;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background .15s;
+  }
+  .cell:focus { outline: none; }
+  .cell:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .cell.empty { box-shadow: inset 0 0 0 .5px #D3D0C8; }
+  .cell.empty:hover { background: rgba(0,0,0,.04); }
+  .cell.filled { cursor: grab; touch-action: none; }
+  .cell.filled.dragging { cursor: grabbing; }
+  .cell.selected { box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px rgba(255,255,255,.85); }
+  .cell.drop { background: rgba(0,0,0,.1); }
+  .ph {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    color: var(--muted);
+    pointer-events: none;
+  }
+  .ph .plus { font-size: clamp(16px, 2.4vh, 24px); font-weight: 400; line-height: 1; }
+  .ph .num { font-size: 10px; letter-spacing: .1em; font-variant-numeric: tabular-nums; }
+  .swap-hint {
+    font-size: 10px;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    background: rgba(245,244,240,.88);
+    color: var(--ink);
+    padding: 3px 6px;
+    pointer-events: none;
+  }
+  .spin {
+    width: 18px;
+    height: 18px;
+    border: 1.5px solid var(--line);
+    border-top-color: var(--ink);
+    border-radius: 50%;
+    animation: spin .8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Panel ---------- */
+  .panel { width: 100%; max-width: 480px; }
+  .step {
+    padding: 16px 0;
+    border-top: 1px solid var(--line);
+  }
+  .step:first-child { border-top: 0; padding-top: 0; }
+  .step .label { margin-bottom: 10px; }
+  .hint { margin: 10px 0 0; color: var(--muted); font-size: 13px; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .btn {
+    appearance: none;
+    border: 1px solid var(--ink);
+    background: transparent;
+    padding: 10px 16px;
+    min-height: 42px;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: .01em;
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
+  }
+  .btn:hover:not(:disabled) { background: var(--ink); color: var(--bg); }
+  .btn:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  .btn:disabled { opacity: .35; cursor: not-allowed; }
+  .btn.quiet { border-color: var(--line); }
+  .btn.quiet:hover:not(:disabled) { border-color: var(--ink); }
+  .btn.primary { background: var(--ink); color: var(--bg); }
+  .btn.primary:hover:not(:disabled) { background: #333; border-color: #333; }
+  .btn.armed { background: var(--ink); color: var(--bg); }
+  .btn.wide { width: 100%; }
+  .btn.small { padding: 8px 12px; min-height: 36px; flex: 1; }
+
+  .sel-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 12px;
+    font-size: 13px;
+  }
+  .sel-title button {
+    border: 0; background: none; padding: 0; cursor: pointer;
+    color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px;
+  }
+  .sel-title button:hover { color: var(--ink); }
+  .zoom {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 28px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track { height: 1px; background: var(--ink); }
+  input[type=range]::-moz-range-track { height: 1px; background: var(--ink); }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px; height: 16px; margin-top: -7.5px;
+    border-radius: 50%; background: var(--ink); border: 0;
+  }
+  input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--ink); border: 0; }
+  input[type=range]:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  .export {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg);
+    padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    z-index: 2;
+  }
+  .export .hint { text-align: center; margin-top: 8px; font-size: 12px; }
+
+  /* ---------- Toast ---------- */
+  .toast {
+    position: fixed;
+    left: 50%;
+    top: calc(16px + env(safe-area-inset-top));
+    transform: translate(-50%, -8px);
+    max-width: min(440px, calc(100vw - 32px));
+    background: var(--ink);
+    color: var(--bg);
+    padding: 11px 16px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
+    z-index: 10;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+  /* ---------- Phone: keep grid, tools and download on one screen ---------- */
+  @media (max-width: 879px) {
+    .top { padding-top: calc(12px + env(safe-area-inset-top)); padding-bottom: 10px; }
+    .layout { padding-top: 14px; gap: 14px; }
+    .stage {
+      height: min(calc(100vh - 290px), calc((100vw - 32px) * 16 / 9));
+      height: min(calc(100svh - 290px), calc((100vw - 32px) * 16 / 9));
+    }
+    /* The Add section and the Adjust tools share one slot under the grid. */
+    body.editing #addStep { display: none; }
+    body:not(.editing) #adjustStep { display: none; }
+    body.editing #adjustStep { border-top: 0; padding-top: 0; }
+    #adjustStep .label, #editIdle { display: none; }
+    .export {
+      padding-top: 12px;
+      /* Full-bleed background so content scrolling underneath never peeks out. */
+      box-shadow: 0 0 0 100vmax var(--bg);
+      clip-path: inset(0 -100vmax -100vmax);
+    }
+    .export .label, .export .hint { display: none; }
+  }
+
+  /* ---------- Desktop ---------- */
+  @media (min-width: 880px) {
+    .top { padding: 28px 32px 18px; }
+    h1 { font-size: 24px; }
+    .ticks { grid-template-columns: repeat(9, 12px); }
+    .layout {
+      flex-direction: row;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 56px;
+      padding: 32px 32px 40px;
+    }
+    .stage { height: min(calc(100vh - 170px), 860px); min-height: 520px; }
+    .panel { width: 320px; position: sticky; top: 32px; }
+    .export { position: static; padding-bottom: 0; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation-duration: 2s !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <p class="eyebrow">3×3 Grid</p>
+    <h1>Design Wander</h1>
+  </div>
+  <div class="progress" aria-live="polite">
+    <div class="progress-num"><strong id="count">0</strong> / 9 photos</div>
+    <div class="ticks" id="ticks" aria-hidden="true"></div>
+  </div>
+</header>
+
+<main class="layout">
+  <div class="stage" id="stage">
+    <canvas id="preview" aria-hidden="true"></canvas>
+    <div class="cells" id="cells" role="group" aria-label="Photo grid"></div>
+  </div>
+
+  <aside class="panel">
+    <section class="step" id="addStep">
+      <div class="row">
+        <button class="btn" id="addBtn" style="flex:1">Add photos</button>
+        <button class="btn quiet" id="clearBtn" hidden>Clear all</button>
+      </div>
+      <p class="hint" id="addHint">Choose up to nine at once, or tap any empty square.</p>
+    </section>
+
+    <section class="step" id="adjustStep">
+      <p class="label">Adjust</p>
+      <p class="hint" id="editIdle" style="margin-top:0">Tap a photo to select it. Drag to reposition, pinch or scroll to zoom.</p>
+      <div id="editTools" hidden>
+        <div class="sel-title">
+          <span id="selName">Photo 01</span>
+          <button id="doneBtn" type="button">Done</button>
+        </div>
+        <label class="zoom">
+          <span>Zoom</span>
+          <input type="range" id="zoom" min="1" max="4" step="0.01" value="1" aria-label="Zoom">
+        </label>
+        <div class="row">
+          <button class="btn small" id="replaceBtn">Replace</button>
+          <button class="btn small" id="swapBtn">Swap</button>
+          <button class="btn small" id="resetBtn">Reset</button>
+          <button class="btn small" id="removeBtn">Remove</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="step export">
+      <p class="label">Export</p>
+      <button class="btn primary wide" id="downloadBtn" disabled>Download PNG</button>
+      <p class="hint">1080 × 1920 px · Instagram Story</p>
+    </section>
+  </aside>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<input type="file" id="multiInput" accept="image/*,.heic,.heif" multiple hidden>
+<input type="file" id="singleInput" accept="image/*,.heic,.heif" hidden>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Story geometry (export pixels) ----------
+  // Full-frame grid: nine 360×640 cells, edge to edge, no gaps.
+  const W = 1080, H = 1920;
+  const CW = W / 3, CH = H / 3;
+  const EMPTY = '#E8E6E0';
+  const MAX_SRC = 1600;                        // longest side kept in memory per photo
+  const MAX_ZOOM = 4;
+  const FILE_NAME = 'design-wander-moodboard.png';
+
+  // ---------- State ----------
+  // Each slot: null | { loading: true, token } | { img, w, h, zoom, ox, oy, name }
+  // ox/oy are offsets of the photo's centre from the cell's centre, in cell widths/heights.
+  const slots = Array(9).fill(null);
+  let selected = null;
+  let swapFrom = null;
+  let targetIndex = null;
+  let tokenSeq = 0;
+
+  // ---------- Elements ----------
+  const $ = (id) => document.getElementById(id);
+  const stage = $('stage'), canvas = $('preview'), ctx = canvas.getContext('2d');
+  const cellsEl = $('cells');
+  const multiInput = $('multiInput'), singleInput = $('singleInput');
+  const zoomInput = $('zoom');
+
+  const cellRect = (i) => ({ x: (i % 3) * CW, y: Math.floor(i / 3) * CH });
+  const isPhoto = (s) => s && !s.loading;
+  const filledCount = () => slots.filter(isPhoto).length;
+  const pad2 = (n) => String(n).padStart(2, '0');
+
+  // ---------- Build grid overlay ----------
+  const cellEls = [];
+  for (let i = 0; i < 9; i++) {
+    const { x, y } = cellRect(i);
+    const el = document.createElement('button');
+    el.type = 'button';
+    el.className = 'cell empty';
+    el.style.left = (x / W * 100) + '%';
+    el.style.top = (y / H * 100) + '%';
+    el.style.width = (CW / W * 100) + '%';
+    el.style.height = (CH / H * 100) + '%';
+    cellsEl.appendChild(el);
+    cellEls.push(el);
+    bindCell(el, i);
+  }
+  const ticksEl = $('ticks');
+  for (let i = 0; i < 9; i++) ticksEl.appendChild(document.createElement('i'));
+
+  // ---------- Drawing ----------
+  function clampSlot(s) {
+    s.zoom = Math.min(MAX_ZOOM, Math.max(1, s.zoom));
+    const k = Math.max(CW / s.w, CH / s.h) * s.zoom;
+    const mx = (s.w * k / CW - 1) / 2;
+    const my = (s.h * k / CH - 1) / 2;
+    s.ox = Math.min(mx, Math.max(-mx, s.ox));
+    s.oy = Math.min(my, Math.max(-my, s.oy));
+  }
+
+  function drawPhoto(c, s, x, y, w, h) {
+    clampSlot(s);
+    const k = Math.max(w / s.w, h / s.h) * s.zoom;   // object-fit: cover, then zoom
+    const dw = s.w * k, dh = s.h * k;
+    const dx = x + (w - dw) / 2 + s.ox * w;
+    const dy = y + (h - dh) / 2 + s.oy * h;
+    c.save();
+    c.beginPath();
+    c.rect(x, y, w, h);
+    c.clip();
+    c.drawImage(s.img, dx, dy, dw, dh);
+    c.restore();
+  }
+
+  // Draws the full story in 1080×1920 coordinates. Used for both preview and export.
+  function drawStory(c) {
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
+    for (let i = 0; i < 9; i++) {
+      const { x, y } = cellRect(i);
+      if (isPhoto(slots[i])) {
+        drawPhoto(c, slots[i], x, y, CW, CH);
+      } else {
+        c.fillStyle = EMPTY;
+        c.fillRect(x, y, CW, CH);
+      }
+    }
+  }
+
+  let rafId = 0;
+  function render() {
+    if (rafId) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = 0;
+      const r = stage.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 3);
+      const pw = Math.max(1, Math.round(r.width * dpr));
+      const ph = Math.max(1, Math.round(r.height * dpr));
+      if (canvas.width !== pw || canvas.height !== ph) {
+        canvas.width = pw;
+        canvas.height = ph;
+      }
+      ctx.setTransform(pw / W, 0, 0, ph / H, 0, 0);
+      drawStory(ctx);
+    });
+  }
+
+  // ---------- UI sync ----------
+  function updateUI() {
+    const n = filledCount();
+    $('count').textContent = n;
+    [...ticksEl.children].forEach((t, i) => t.classList.toggle('on', i < n));
+
+    cellEls.forEach((el, i) => {
+      const s = slots[i];
+      const state = !s ? 'empty' : s.loading ? 'loading' : 'filled';
+      el.classList.toggle('empty', state === 'empty');
+      el.classList.toggle('filled', state === 'filled');
+      el.classList.toggle('selected', selected === i && swapFrom === null);
+      let html = '';
+      if (state === 'empty') {
+        html = `<span class="ph"><span class="plus">+</span><span class="num">${pad2(i + 1)}</span></span>`;
+        el.setAttribute('aria-label', `Cell ${i + 1}, empty. Add a photo`);
+      } else if (state === 'loading') {
+        html = '<span class="spin"></span>';
+        el.setAttribute('aria-label', `Cell ${i + 1}, loading`);
+      } else {
+        el.setAttribute('aria-label', `Cell ${i + 1}, ${s.name || 'photo'}${selected === i ? ', selected' : ''}`);
+      }
+      if (swapFrom !== null && i !== swapFrom && state !== 'loading') {
+        html = `<span class="swap-hint">${state === 'empty' ? 'Move here' : 'Swap'}</span>`;
+      }
+      if (el._html !== html) { el.innerHTML = html; el._html = html; }
+    });
+
+    const sel = selected !== null && isPhoto(slots[selected]) ? slots[selected] : null;
+    if (!sel) selected = null;
+    $('editTools').hidden = !sel;
+    $('editIdle').hidden = !!sel;
+    document.body.classList.toggle('editing', !!sel);
+    $('addHint').textContent = n === 0
+      ? 'Choose up to nine at once, or tap any empty square.'
+      : 'Tap a photo to adjust it. Drag to reposition, pinch or scroll to zoom.';
+    if (sel) {
+      $('selName').textContent = `Photo ${pad2(selected + 1)}`;
+      zoomInput.value = sel.zoom;
+      $('swapBtn').textContent = swapFrom !== null ? 'Cancel' : 'Swap';
+      $('swapBtn').classList.toggle('armed', swapFrom !== null);
+    }
+    $('downloadBtn').disabled = n === 0;
+    // Add only while there's room; Clear only once something is in the grid.
+    const full = slots.every((s) => s);
+    $('addBtn').hidden = full;
+    $('clearBtn').hidden = slots.every((s) => !s);
+    $('clearBtn').style.flex = full ? '1' : '';
+    $('addBtn').textContent = n === 0 ? 'Add photos' : 'Add more';
+    if (!downloadArmed) $('downloadBtn').textContent = 'Download PNG';
+    render();
+  }
+
+  function select(i) {
+    selected = i;
+    updateUI();
+  }
+
+  // ---------- Toast ----------
+  let toastTimer = 0;
+  function toast(msg, ms = 4200) {
+    const el = $('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove('show'), ms);
+  }
+
+  // ---------- File handling ----------
+  const OK_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp'];
+  const OK_EXT = /\.(jpe?g|png|heic|heif|webp)$/i;
+  const isHeic = (f) => /heic|heif/i.test(f.type) || /\.(heic|heif)$/i.test(f.name || '');
+  const isSupported = (f) => OK_TYPES.includes((f.type || '').toLowerCase()) || OK_EXT.test(f.name || '');
+
+  function loadImage(blob) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => resolve({ img, url });
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('decode')); };
+      img.src = url;
+    });
+  }
+
+  // Decodes a blob and downscales it into a canvas we keep in memory.
+  async function blobToCanvas(blob) {
+    const { img, url } = await loadImage(blob);
+    try {
+      const w0 = img.naturalWidth, h0 = img.naturalHeight;
+      if (!w0 || !h0) throw new Error('empty');
+      const k = Math.min(1, MAX_SRC / Math.max(w0, h0));
+      const c = document.createElement('canvas');
+      c.width = Math.round(w0 * k);
+      c.height = Math.round(h0 * k);
+      const x = c.getContext('2d');
+      x.imageSmoothingQuality = 'high';
+      x.drawImage(img, 0, 0, c.width, c.height);
+      return c;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
+
+  let heicLib = null;
+  function loadHeicLib() {
+    if (window.heic2any) return Promise.resolve(window.heic2any);
+    if (!heicLib) {
+      heicLib = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/heic2any@0.0.4/dist/heic2any.min.js';
+        s.onload = () => window.heic2any ? resolve(window.heic2any) : reject(new Error('heic lib'));
+        s.onerror = () => { heicLib = null; reject(new Error('heic lib')); };
+        document.head.appendChild(s);
+      });
+    }
+    return heicLib;
+  }
+
+  async function decodeFile(file) {
+    try {
+      return await blobToCanvas(file);
+    } catch (err) {
+      if (!isHeic(file)) throw err;
+    }
+    // Browser can't read HEIC natively (most non-Safari browsers): convert in-browser.
+    const heic2any = await loadHeicLib();
+    let out = await heic2any({ blob: file, toType: 'image/jpeg', quality: 0.92 });
+    if (Array.isArray(out)) out = out[0];
+    return blobToCanvas(out);
+  }
+
+  async function addFiles(fileList, start = null, replace = false) {
+    let files = [...fileList];
+    if (!files.length) return;
+
+    const bad = files.filter((f) => !isSupported(f));
+    files = files.filter(isSupported);
+
+    let targets;
+    if (replace && start !== null) {
+      targets = [start];
+    } else {
+      targets = [];
+      const s0 = start ?? 0;
+      for (let k = 0; k < 9; k++) {
+        const idx = (s0 + k) % 9;
+        if (!slots[idx]) targets.push(idx);
+      }
+    }
+    const skipped = Math.max(0, files.length - targets.length);
+    files = files.slice(0, targets.length);
+
+    const messages = [];
+    if (bad.length) {
+      messages.push(bad.length === 1
+        ? `“${bad[0].name}” isn't supported. Use JPG, PNG or HEIC.`
+        : `${bad.length} files weren't supported. Use JPG, PNG or HEIC.`);
+    }
+    if (skipped) messages.push(`The grid holds nine — ${skipped} photo${skipped > 1 ? 's were' : ' was'} left out.`);
+    if (!files.length) {
+      if (messages.length) toast(messages.join(' '));
+      return;
+    }
+
+    const jobs = files.map((file, n) => {
+      const idx = targets[n];
+      const prev = slots[idx];
+      const token = ++tokenSeq;
+      slots[idx] = { loading: true, token };
+      return { file, idx, prev, token };
+    });
+    updateUI();
+
+    const failed = [];
+    for (const job of jobs) {
+      let photo = null;
+      try {
+        const img = await decodeFile(job.file);
+        photo = { img, w: img.width, h: img.height, zoom: 1, ox: 0, oy: 0, name: job.file.name };
+      } catch (err) {
+        failed.push(job.file.name || 'photo');
+      }
+      // Skip if the cell was cleared/replaced while we were decoding.
+      if (!slots[job.idx] || slots[job.idx].token !== job.token) continue;
+      slots[job.idx] = photo || (isPhoto(job.prev) ? job.prev : null);
+      updateUI();
+    }
+    if (failed.length) {
+      messages.push(failed.length === 1
+        ? `Couldn't open “${failed[0]}”. Try saving it as JPG and uploading again.`
+        : `Couldn't open ${failed.length} photos. Try saving them as JPG and uploading again.`);
+    }
+    if (messages.length) toast(messages.join(' '), 6000);
+    if (replace && start !== null && isPhoto(slots[start])) select(start);
+  }
+
+  function openPicker(index = null, replace = false) {
+    targetIndex = index;
+    const input = replace ? singleInput : multiInput;
+    input.value = '';
+    input.click();
+  }
+  multiInput.addEventListener('change', () => addFiles(multiInput.files, targetIndex, false));
+  singleInput.addEventListener('change', () => addFiles(singleInput.files, targetIndex, true));
+
+  // ---------- Cell interaction: tap, drag to pan, pinch / wheel to zoom ----------
+  function bindCell(el, i) {
+    const pointers = new Map();
+    let g = null;            // active gesture
+    let suppressClick = false;
+
+    const startPan = (p) => {
+      const s = slots[i];
+      g = { ...g, sx: p.x, sy: p.y, ox: s.ox, oy: s.oy, pinch: null };
+    };
+    const startPinch = () => {
+      const [a, b] = [...pointers.values()];
+      g.pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, zoom: slots[i].zoom };
+    };
+
+    el.addEventListener('pointerdown', (e) => {
+      if (!isPhoto(slots[i]) || swapFrom !== null) return;
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      el.setPointerCapture(e.pointerId);
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (pointers.size === 1) {
+        g = { moved: false };
+        startPan({ x: e.clientX, y: e.clientY });
+      } else if (pointers.size === 2 && g) {
+        g.moved = true;
+        startPinch();
+      }
+    });
+
+    el.addEventListener('pointermove', (e) => {
+      if (!g || !pointers.has(e.pointerId)) return;
+      pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      const s = slots[i];
+      if (!isPhoto(s)) return;
+      if (pointers.size >= 2 && g.pinch) {
+        const [a, b] = [...pointers.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        s.zoom = g.pinch.zoom * d / g.pinch.d;
+      } else {
+        const dx = e.clientX - g.sx, dy = e.clientY - g.sy;
+        if (!g.moved && Math.hypot(dx, dy) > 4) {
+          g.moved = true;
+          el.classList.add('dragging');
+          if (selected !== i) select(i);
+        }
+        if (!g.moved) return;
+        const r = el.getBoundingClientRect();
+        s.ox = g.ox + dx / (r.width || 1);
+        s.oy = g.oy + dy / (r.height || 1);
+      }
+      clampSlot(s);
+      zoomInput.value = s.zoom;
+      render();
+    });
+
+    const end = (e) => {
+      if (!pointers.has(e.pointerId)) return;
+      pointers.delete(e.pointerId);
+      if (pointers.size === 1 && g) {
+        // Pinch → pan: continue panning with the remaining finger.
+        const [p] = [...pointers.values()];
+        startPan(p);
+        g.moved = true;
+      } else if (pointers.size === 0) {
+        if (g && g.moved) suppressClick = true;
+        g = null;
+        el.classList.remove('dragging');
+      }
+    };
+    el.addEventListener('pointerup', end);
+    el.addEventListener('pointercancel', end);
+
+    el.addEventListener('click', () => {
+      if (suppressClick) { suppressClick = false; return; }
+      handleTap(i);
+    });
+
+    el.addEventListener('wheel', (e) => {
+      const s = slots[i];
+      if (!isPhoto(s)) return;
+      e.preventDefault();
+      if (selected !== i) select(i);
+      s.zoom *= Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025));
+      clampSlot(s);
+      zoomInput.value = s.zoom;
+      render();
+    }, { passive: false });
+
+    // Desktop: drop files straight onto a cell.
+    el.addEventListener('dragover', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      el.classList.add('drop');
+    });
+    el.addEventListener('dragleave', () => el.classList.remove('drop'));
+    el.addEventListener('drop', (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      el.classList.remove('drop');
+      const files = e.dataTransfer.files;
+      if (isPhoto(slots[i]) && files.length === 1) addFiles(files, i, true);
+      else addFiles(files, i, false);
+    });
+  }
+
+  function handleTap(i) {
+    const s = slots[i];
+    if (s && s.loading) return;
+    if (swapFrom !== null) {
+      if (i !== swapFrom) {
+        [slots[swapFrom], slots[i]] = [slots[i], slots[swapFrom]];
+        selected = isPhoto(slots[i]) ? i : null;
+      }
+      swapFrom = null;
+      updateUI();
+      return;
+    }
+    if (!s) { openPicker(i); return; }
+    select(selected === i ? null : i);
+  }
+
+  const hasFiles = (e) => e.dataTransfer && [...e.dataTransfer.types].includes('Files');
+  window.addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  window.addEventListener('drop', (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault();
+    addFiles(e.dataTransfer.files);
+  });
+
+  // ---------- Panel controls ----------
+  $('addBtn').addEventListener('click', () => openPicker(null));
+
+  // Two-step confirm for destructive or incomplete actions, without blocking dialogs.
+  function arm(btn, label, ms = 3500) {
+    btn.dataset.label = btn.textContent;
+    btn.textContent = label;
+    btn.classList.add('armed');
+    clearTimeout(btn._t);
+    btn._t = setTimeout(() => disarm(btn), ms);
+  }
+  function disarm(btn) {
+    clearTimeout(btn._t);
+    if (btn.dataset.label) btn.textContent = btn.dataset.label;
+    btn.classList.remove('armed');
+    delete btn.dataset.label;
+    if (btn.id === 'downloadBtn') downloadArmed = false;
+  }
+
+  $('clearBtn').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    if (!btn.classList.contains('armed')) { arm(btn, 'Tap to confirm'); return; }
+    disarm(btn);
+    slots.fill(null);
+    selected = null;
+    swapFrom = null;
+    updateUI();
+  });
+
+  zoomInput.addEventListener('input', () => {
+    const s = slots[selected];
+    if (!isPhoto(s)) return;
+    s.zoom = parseFloat(zoomInput.value);
+    clampSlot(s);
+    render();
+  });
+  $('doneBtn').addEventListener('click', () => { swapFrom = null; select(null); });
+  $('replaceBtn').addEventListener('click', () => openPicker(selected, true));
+  $('resetBtn').addEventListener('click', () => {
+    const s = slots[selected];
+    if (!isPhoto(s)) return;
+    Object.assign(s, { zoom: 1, ox: 0, oy: 0 });
+    updateUI();
+  });
+  $('removeBtn').addEventListener('click', () => {
+    if (selected === null) return;
+    slots[selected] = null;
+    selected = null;
+    swapFrom = null;
+    updateUI();
+  });
+  $('swapBtn').addEventListener('click', () => {
+    swapFrom = swapFrom === null ? selected : null;
+    if (swapFrom !== null) toast('Tap another square to swap with this photo.', 2600);
+    updateUI();
+  });
+
+  // Keyboard: arrows pan, +/- zoom, Delete removes, Esc deselects.
+  document.addEventListener('keydown', (e) => {
+    if (e.target.matches('input')) return;
+    if (e.key === 'Escape') { swapFrom = null; select(null); return; }
+    const s = slots[selected];
+    if (!isPhoto(s)) return;
+    const step = e.shiftKey ? 0.1 : 0.02;
+    const moves = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] };
+    if (moves[e.key]) {
+      s.ox += moves[e.key][0];
+      s.oy += moves[e.key][1];
+    } else if (e.key === '+' || e.key === '=') {
+      s.zoom *= 1.1;
+    } else if (e.key === '-' || e.key === '_') {
+      s.zoom /= 1.1;
+    } else if (e.key === 'Delete' || e.key === 'Backspace') {
+      $('removeBtn').click();
+      e.preventDefault();
+      return;
+    } else {
+      return;
+    }
+    e.preventDefault();
+    clampSlot(s);
+    zoomInput.value = s.zoom;
+    render();
+  });
+
+  // ---------- Export ----------
+  let downloadArmed = false;
+
+  function dataURLToBlob(url) {
+    const [head, b64] = url.split(',');
+    const mime = head.match(/:(.*?);/)[1];
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: mime });
+  }
+
+  function saveBlob(blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = FILE_NAME;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+  }
+
+  $('downloadBtn').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
+    const n = filledCount();
+    if (n === 0) return;
+    if (n < 9 && !downloadArmed) {
+      downloadArmed = true;
+      arm(btn, `${9 - n} empty — download anyway?`, 4000);
+      return;
+    }
+    disarm(btn);
+
+    // Render synchronously so mobile share sheets keep the tap's user activation.
+    const out = document.createElement('canvas');
+    out.width = W;
+    out.height = H;
+    drawStory(out.getContext('2d'));
+    let blob;
+    try {
+      blob = dataURLToBlob(out.toDataURL('image/png'));
+    } catch (err) {
+      toast('Something went wrong creating the image. Please try again.');
+      return;
+    }
+
+    const coarse = window.matchMedia('(pointer: coarse)').matches;
+    let file = null;
+    try { file = new File([blob], FILE_NAME, { type: 'image/png' }); } catch (_) {}
+    if (coarse && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file], title: 'Design Wander' })
+        .catch((err) => { if (err.name !== 'AbortError') saveBlob(blob); });
+      return;
+    }
+    saveBlob(blob);
+    toast('Saved — 1080 × 1920 PNG.', 2600);
+  });
+
+  window.addEventListener('beforeunload', (e) => {
+    if (slots.some(isPhoto)) { e.preventDefault(); e.returnValue = ''; }
+  });
+
+  // ---------- Boot ----------
+  new ResizeObserver(render).observe(stage);
+  updateUI();
+})();
+</script>
+</body>
+</html>
